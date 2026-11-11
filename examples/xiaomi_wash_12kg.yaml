@@ -1,0 +1,181 @@
+type: vertical-stack
+cards:
+  # Card hoạt hình: không cần power_entity / energy_entity / cost_entity
+  - type: custom:washing-machine-card
+    appliance_type: washer
+    name: XIAOMI WASH 12KG
+    status_entity: sensor.mibx5_f91_77fa_run_status
+    running_states:
+      - washing
+      - running
+      - run
+      - wash
+      - spin
+      - rinse
+      - drying
+      - dry
+      - tumble
+    remaining_entity: sensor.mibx5_f91_77fa_left_time
+    show_raw_status: true
+    language: en
+    theme: auto
+
+  # Điều khiển máy
+  - type: grid
+    columns: 5
+    square: false
+    cards:
+      - type: button
+        name: Bắt đầu
+        icon: mdi:play-circle
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.mibx5_f91_77fa_start_wash
+      - type: button
+        name: Tạm dừng
+        icon: mdi:pause-circle
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.mibx5_f91_77fa_pause
+      - type: button
+        name: Dừng
+        icon: mdi:stop-circle
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          confirmation:
+            text: Bạn có chắc chắn muốn dừng máy giặt?
+          target:
+            entity_id: button.mibx5_f91_77fa_stop_washing
+      - type: button
+        name: Mở cửa
+        icon: mdi:door-open
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.mibx5_f91_77fa_make_cabin_openable
+      - type: button
+        name: Thông tin
+        icon: mdi:information-outline
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.mibx5_f91_77fa_info
+
+  # Chương trình giặt
+  - type: entities
+    title: 🧺 Chương trình giặt
+    show_header_toggle: false
+    entities:
+      - entity: select.mibx5_f91_77fa_mode
+        name: Chế độ giặt
+      - entity: select.mibx5_f91_77fa_target_temperature
+        name: Nhiệt độ
+      - entity: select.mibx5_f91_77fa_spin_speed
+        name: Tốc độ vắt
+      - entity: select.mibx5_f91_77fa_rinsh_times
+        name: Số lần xả
+      - entity: select.mibx5_f91_77fa_wash_time
+        name: Thời gian giặt
+      - entity: select.mibx5_f91_77fa_soak_time
+        name: Thời gian ngâm
+      - entity: select.mibx5_f91_77fa_shake_time
+        name: Thời gian chống nhăn
+
+  # Sấy
+  - type: entities
+    title: 🌬️ Cài đặt sấy
+    show_header_toggle: false
+    entities:
+      - entity: select.mibx5_f91_77fa_drying_degree
+        name: Mức độ sấy
+      - entity: select.mibx5_f91_77fa_drying_level
+        name: Cấp độ sấy
+      - entity: select.mibx5_f91_77fa_drying_time
+        name: Thời gian sấy
+
+  # Chức năng máy
+  - type: entities
+    title: ⚙️ Chức năng thông minh
+    show_header_toggle: false
+    entities:
+      - entity: switch.mibx5_f91_77fa_ai_mode
+        name: Chế độ AI
+      - entity: switch.mibx5_f91_77fa_steam_sterilization
+        name: Khử khuẩn hơi nước
+      - entity: switch.mibx5_f91_77fa_high_water_switch
+        name: Mực nước cao
+      - entity: switch.mibx5_f91_77fa_physical_control_locked
+        name: Khóa bảng điều khiển
+      - entity: switch.mibx5_f91_77fa_sleep_mode
+        name: Chế độ ngủ
+      - entity: switch.mibx5_f91_77fa_alarm
+        name: Âm báo
+      - entity: switch.mibx5_f91_77fa_switch_status
+        name: Trạng thái công tắc
+
+  # Trạng thái / thống kê
+  - type: entities
+    title: 🔍 Giám sát máy giặt
+    show_header_toggle: false
+    entities:
+      - entity: sensor.mibx5_f91_77fa_washer
+        name: Trạng thái máy
+      - entity: sensor.mibx5_f91_77fa_run_status
+        name: Tiến trình giặt
+      - entity: sensor.mibx5_f91_77fa_left_time
+        name: Thời gian còn lại (phút)
+      - entity: sensor.mibx5_f91_77fa_door_state
+        name: Cửa máy
+      - entity: sensor.mibx5_f91_77fa_device_fault
+        name: Lỗi thiết bị
+      - entity: sensor.mibx5_f91_77fa_has_washed_times
+        name: Tổng số lần giặt
+
+  # Hẹn giờ
+  - type: entities
+    title: ⏰ Giặt hẹn giờ
+    show_header_toggle: false
+    entities:
+      - entity: select.mibx5_f91_77fa_reservation_wash_status
+        name: Trạng thái hẹn giờ
+      - entity: select.mibx5_f91_77fa_reservation_left_time
+        name: Thời gian chờ
+
+  # Dữ liệu bổ sung / Cloud Collect
+  - type: entities
+    title: ☁️ Dữ liệu Cloud Collect
+    show_header_toggle: false
+    entities:
+      - entity: sensor.mibx5_f91_77fa_fault
+        name: Lỗi Cloud
+      - entity: sensor.mibx5_f91_77fa_run_status_2
+        name: Tiến trình Cloud
+      - entity: sensor.mibx5_f91_77fa_left_time_2
+        name: Thời gian còn lại Cloud
+      - entity: sensor.mibx5_f91_77fa_door_state_2
+        name: Cửa máy Cloud
+      - entity: sensor.mibx5_f91_77fa_water_temperature
+        name: Nhiệt độ nước Cloud
+
+  # Data logging
+  - type: entities
+    title: 📈 Thông số Data Logging
+    show_header_toggle: false
+    entities:
+      - entity: select.mibx5_f91_77fa_spin_speed_2
+        name: Tốc độ vắt ghi log
+      - entity: select.mibx5_f91_77fa_target_temperature_2
+        name: Nhiệt độ ghi log
+      - entity: select.mibx5_f91_77fa_shake_time_2
+        name: Chống nhăn ghi log
+      - entity: select.mibx5_f91_77fa_soak_time_2
+        name: Ngâm ghi log
+      - entity: select.mibx5_f91_77fa_wash_time_2
+        name: Thời gian giặt ghi log
