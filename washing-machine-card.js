@@ -41,6 +41,8 @@ class WashingMachineCard extends HTMLElement {
             today: "Today", yesterday: "Yesterday",
             tip_notify: "Finish notification", tip_plug: "Machine plug", tip_history: "History",
             confirm_plug_off: "Turn off the plug? This may interrupt the current cycle.",
+            ctl_start: "Start", ctl_pause: "Pause", ctl_stop: "Stop", ctl_mode: "MODE",
+            confirm_stop: "Stop the current program?",
             types: {
                 washer: { name: "Washing machine", state_running: "Washing" },
                 dryer: { name: "Dryer", state_running: "Drying" },
@@ -210,6 +212,7 @@ class WashingMachineCard extends HTMLElement {
         hide_status_panel: false,
         show_raw_status: false,
         confirm_plug_off: true,
+        confirm_stop: true,
         duration_format: "minutes",
     };
 
@@ -639,6 +642,75 @@ class WashingMachineCard extends HTMLElement {
         this._hass.callService(svcDomain, "toggle", {
             entity_id: entityId
         });
+    }
+
+    _press(entityId) {
+        const domain = String(entityId).split(".")[0];
+        if (domain === "button" || domain === "input_button")
+            return this._hass.callService(domain, "press", { entity_id: entityId });
+        if (domain === "script" || domain === "scene")
+            return this._hass.callService(domain, "turn_on", { entity_id: entityId });
+        return this._hass.callService("homeassistant", "turn_on", { entity_id: entityId });
+    }
+
+    _selectOption(entityId, option) {
+        const domain = String(entityId).split(".")[0];
+        this._hass.callService(domain, "select_option", { entity_id: entityId, option });
+    }
+
+    _ctlText(key, fallback) {
+        const c = this._config;
+        const en = WashingMachineCard.STRINGS.en;
+        return c[`${key}_label`] ?? this._t?.[`ctl_${key}`] ?? en[`ctl_${key}`] ?? fallback;
+    }
+
+    _updateControls() {
+        const c = this._config;
+        const has = !!(c.start_entity || c.pause_entity || c.stop_entity || c.mode_entity);
+        if (!has)
+            return;
+        this._el("controls").classList.remove("hidden");
+        const btns = [["start", "ctlStart"], ["pause", "ctlPause"], ["stop", "ctlStop"]];
+        let n = 0;
+        for (const [key, id] of btns) {
+            const ent = c[`${key}_entity`];
+            const el = this._el(id);
+            if (!ent) continue;
+            n++;
+            el.classList.remove("hidden");
+            this._el(`${id}L`).textContent = this._ctlText(key, key);
+            const st = this._st(ent);
+            el.disabled = !st || st.state === "unavailable";
+        }
+        this._el("ctlRow").style.setProperty("--ctl-cols", String(n || 1));
+        this._el("ctlRow").classList.toggle("hidden", n === 0);
+        if (c.mode_entity) {
+            const st = this._st(c.mode_entity);
+            const box = this._el("ctlMode");
+            const sel = this._el("ctlModeSel");
+            box.classList.remove("hidden");
+            this._el("ctlModeLabel").textContent = c.mode_label ?? this._t?.ctl_mode ?? WashingMachineCard.STRINGS.en.ctl_mode;
+            const opts = Array.isArray(st?.attributes?.options) ? st.attributes.options : [];
+            const sig = opts.join("\u0001");
+            if (sig !== this._modeSig) {
+                this._modeSig = sig;
+                sel.innerHTML = "";
+                for (const o of opts) {
+                    const op = document.createElement("option");
+                    op.value = o;
+                    let label = o;
+                    try {
+                        if (typeof this._hass?.formatEntityState === "function")
+                            label = this._hass.formatEntityState(st, o) || o;
+                    } catch (e) { label = o; }
+                    op.textContent = label;
+                    sel.appendChild(op);
+                }
+            }
+            sel.disabled = !st || st.state === "unavailable" || opts.length === 0;
+            if (st && this.shadowRoot.activeElement !== sel && opts.includes(st.state))
+                sel.value = st.state;
+        }
     }
 
     _confirmTogglePlug() {
@@ -1489,6 +1561,32 @@ class WashingMachineCard extends HTMLElement {
         .lc-tiles .lc-label { font-size: 10.5px; }
         .lc-tiles .lc-value { font-size: 18px; margin-top: 6px; line-height: 1.2; }
         .lc-tiles .lc-unit { font-size: 12px; margin-left: 3px; }
+        .ctl-row { display: grid; grid-template-columns: repeat(var(--ctl-cols, 3), minmax(0, 1fr)); gap: 10px; }
+        .ctl-btn {
+          display: flex; flex-direction: column; align-items: center; gap: 6px;
+          padding: 11px 6px; border-radius: 14px; cursor: pointer;
+          border: 1px solid var(--wm-divider); color: var(--wm-text);
+          background: color-mix(in srgb, var(--wm-accent) 7%, transparent);
+          font: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: .4px;
+          transition: background .15s, transform .1s;
+        }
+        .ctl-btn svg { width: 26px; height: 26px; fill: var(--wm-accent); }
+        .ctl-btn:hover { background: color-mix(in srgb, var(--wm-accent) 15%, transparent); }
+        .ctl-btn:active { transform: scale(.96); }
+        .ctl-btn.ctl-stop svg { fill: #e5484d; }
+        .ctl-btn[disabled] { opacity: .4; cursor: default; pointer-events: none; }
+        .ctl-mode { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+        .ctl-row.hidden + .ctl-mode { margin-top: 0; }
+        .ctl-mode-label { font-size: 10px; font-weight: 700; letter-spacing: .8px; color: var(--wm-label); flex-shrink: 0; }
+        .ctl-select {
+          flex: 1; min-width: 0; padding: 10px 12px; border-radius: 12px; cursor: pointer;
+          border: 1px solid var(--wm-divider); color: var(--wm-text);
+          background: color-mix(in srgb, var(--wm-accent) 7%, transparent);
+          font: inherit; font-size: 14px; font-weight: 700;
+        }
+        .ctl-select option { background: #ffffff; color: #1c2733; }
+        :host(.wm-dark) .ctl-select option, :host(.wm-native-dark) .ctl-select option { background: #1f2937; color: #e8eef7; }
+        .ctl-select:disabled { opacity: .5; cursor: default; }
         .hidden { display: none !important; }
       </style>
 
@@ -1557,6 +1655,27 @@ class WashingMachineCard extends HTMLElement {
               </div>
             </div>
           </div>
+
+          <div class="panel hidden" id="controls">
+            <div class="ctl-row" id="ctlRow">
+              <button class="ctl-btn hidden" id="ctlStart" type="button">
+                <svg viewBox="0 0 24 24"><path d="M8,5.14V19.14L19,12.14L8,5.14Z"/></svg>
+                <span id="ctlStartL"></span>
+              </button>
+              <button class="ctl-btn hidden" id="ctlPause" type="button">
+                <svg viewBox="0 0 24 24"><path d="M14,19H18V5H14M6,19H10V5H6V19Z"/></svg>
+                <span id="ctlPauseL"></span>
+              </button>
+              <button class="ctl-btn ctl-stop hidden" id="ctlStop" type="button">
+                <svg viewBox="0 0 24 24"><path d="M18,18H6V6H18V18Z"/></svg>
+                <span id="ctlStopL"></span>
+              </button>
+            </div>
+            <div class="ctl-mode hidden" id="ctlMode">
+              <div class="ctl-mode-label" id="ctlModeLabel"></div>
+              <select class="ctl-select" id="ctlModeSel"></select>
+            </div>
+          </div>
         </div>
       </ha-card>
     `;
@@ -1571,6 +1690,19 @@ class WashingMachineCard extends HTMLElement {
             this._el("notifyBtn").addEventListener("click", () => this._toggle(c.notify_entity));
         if (c.plug_entity)
             this._el("plugBtn").addEventListener("click", () => this._confirmTogglePlug());
+        if (c.start_entity)
+            this._el("ctlStart").addEventListener("click", () => this._press(c.start_entity));
+        if (c.pause_entity)
+            this._el("ctlPause").addEventListener("click", () => this._press(c.pause_entity));
+        if (c.stop_entity)
+            this._el("ctlStop").addEventListener("click", () => {
+                const msg = this._t?.confirm_stop ?? WashingMachineCard.STRINGS.en.confirm_stop;
+                if (c.confirm_stop !== false && !window.confirm(msg))
+                    return;
+                this._press(c.stop_entity);
+            });
+        if (c.mode_entity)
+            this._el("ctlModeSel").addEventListener("change", (ev) => this._selectOption(c.mode_entity, ev.target.value));
         if (c.last_wash_entity)
             this._el("lcStart").addEventListener("click", mi(c.last_wash_entity));
         if (c.duration_entity)
@@ -1727,6 +1859,7 @@ class WashingMachineCard extends HTMLElement {
             this._el("plugBtn").classList.remove("hidden");
             this._el("plugBtn").classList.toggle("on", on);
         }
+        this._updateControls();
     }
 }
 
@@ -2076,6 +2209,68 @@ class WashingMachineCardEditor extends HTMLElement {
                             entity: {
                                 domain: ["switch", "input_boolean"]
                             }
+                        },
+                    }, {
+                        key: "start_entity",
+                        kind: "entity",
+                        title: "Start button entity",
+                        selector: {
+                            entity: {
+                                domain: ["button", "input_button", "script"]
+                            }
+                        },
+                    }, {
+                        key: "pause_entity",
+                        kind: "entity",
+                        title: "Pause button entity",
+                        selector: {
+                            entity: {
+                                domain: ["button", "input_button", "script"]
+                            }
+                        },
+                    }, {
+                        key: "stop_entity",
+                        kind: "entity",
+                        title: "Stop button entity",
+                        selector: {
+                            entity: {
+                                domain: ["button", "input_button", "script"]
+                            }
+                        },
+                    }, {
+                        key: "mode_entity",
+                        kind: "entity",
+                        title: "Mode selector entity",
+                        selector: {
+                            entity: {
+                                domain: ["select", "input_select"]
+                            }
+                        },
+                    }, {
+                        key: "start_label",
+                        kind: "text",
+                        title: "Start button label (optional)",
+                    }, {
+                        key: "pause_label",
+                        kind: "text",
+                        title: "Pause button label (optional)",
+                    }, {
+                        key: "stop_label",
+                        kind: "text",
+                        title: "Stop button label (optional)",
+                    }, {
+                        key: "mode_label",
+                        kind: "text",
+                        title: "Mode selector label (optional)",
+                    }, {
+                        key: "confirm_stop",
+                        kind: "boolean",
+                        title: "Confirm before stopping",
+                        description: "Show a confirmation popup when pressing the stop button.",
+                    default:
+                        D.confirm_stop,
+                        selector: {
+                            boolean: {}
                         },
                     }, {
                         key: "confirm_plug_off",
@@ -2672,6 +2867,11 @@ language: auto                              # auto | en | ru | de | fr | nl | pt
 theme: auto                                 # auto | light | dark | ha (ha = native Home Assistant colours)
 hide_status_panel: false                    # true hides the status panel while idle
 show_raw_status: false                      # true shows the raw value of the status entity in the card's status panel (hidden in the editor when status_entity is an input_boolean)
+start_entity: button.washer_start               # optional: control buttons inside the card
+pause_entity: button.washer_pause
+stop_entity: button.washer_stop
+mode_entity: select.washer_mode             # optional: programme/mode dropdown
+confirm_stop: true                          # confirm before pressing stop
 confirm_plug_off: true                      # true displays a confirmation popup before turning off the `plug_entity`.
 
 # Other appliances — same config, one line changed:
