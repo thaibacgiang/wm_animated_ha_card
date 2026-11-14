@@ -2926,3 +2926,5 @@ confirm_plug_off: true                      # true displays a confirmation popup
 # appliance_type: oven
 # appliance_type: microwave
 ============================================================ */
+
+console.info("%c washing-machine-card %c xiaomi-ui v3: controls + mode + temperature ", "background:#2f80ed;color:#fff;border-radius:3px 0 0 3px", "background:#22b263;color:#fff;border-radius:0 3px 3px 0");
