@@ -55,6 +55,31 @@ class WashingMachineCard extends HTMLElement {
                 "baking", "bake", "cooking", "cook", "heating", "heat", "microwave", "oven",
             ],
         },
+        vi: {
+            name: "Máy giặt",
+            badge_running: "ĐANG CHẠY", badge_idle: "NGHỈ", badge_paused: "TẠM DỪNG", badge_off: "TẮT", badge_standby: "CHỜ", badge_nodata: "KHÔNG CÓ DỮ LIỆU",
+            state_running: "Đang giặt", state_idle: "Đang nghỉ", state_paused: "Tạm dừng", state_off: "Đã tắt", state_standby: "Chế độ chờ", state_nodata: "Không có dữ liệu",
+            ring_running: "ĐÃ CHẠY", ring_idle: "NGHỈ", ring_paused: "TẠM DỪNG", ring_off: "TẮT", ring_standby: "CHỜ", ring_remaining: "CÒN LẠI",
+            power: "Công suất hiện tại", current: "Dòng điện hiện tại",
+            last_cycle: "LẦN GIẶT GẦN NHẤT", start: "BẮT ĐẦU", duration: "THỜI LƯỢNG",
+            energy: "ĐIỆN NĂNG", cost: "CHI PHÍ",
+            min: "phút", kwh: "kWh", kw: "kW",
+            today: "Hôm nay", yesterday: "Hôm qua",
+            tip_notify: "Thông báo khi xong", tip_plug: "Ổ cắm máy", tip_history: "Lịch sử",
+            confirm_plug_off: "Tắt ổ cắm? Việc này có thể làm gián đoạn chu trình đang chạy.",
+            ctl_start: "Bắt đầu", ctl_pause: "Tạm dừng", ctl_stop: "Dừng", ctl_mode: "CHẾ ĐỘ", ctl_temp: "NHIỆT ĐỘ",
+            confirm_stop: "Dừng chương trình đang chạy?",
+            types: {
+                washer: { name: "Máy giặt", state_running: "Đang giặt" },
+                dryer: { name: "Máy sấy", state_running: "Đang sấy" },
+                dishwasher: { name: "Máy rửa bát", state_running: "Đang rửa bát" },
+                oven: { name: "Lò nướng", state_running: "Đang nướng" },
+                microwave: { name: "Lò vi sóng", state_running: "Đang hâm nóng" },
+            },
+            running_states: [
+                "đang giặt", "giặt", "vắt", "xả", "sấy", "đang sấy", "nướng", "đang nướng", "hâm nóng",
+            ],
+        },
         ru: {
             name: "Стиральная машина",
             badge_running: "В РАБОТЕ", badge_idle: "ОЖИДАНИЕ", badge_paused: "ПАУЗА", badge_off: "ВЫКЛ", badge_standby: "ОЖИДАНИЕ", badge_nodata: "НЕТ ДАННЫХ",
@@ -1850,7 +1875,14 @@ class WashingMachineCard extends HTMLElement {
         if (c.show_raw_status && !WashingMachineCard.isBooleanStatusEntity(c.status_entity)) {
             const rawState = status ? String(status.state) : "";
             const capitalizedRaw = WashingMachineCard.capitalize(rawState, t.locale);
-            this._el("stState").textContent = noData ? t.state_nodata : capitalizedRaw;
+            let rawText = capitalizedRaw;
+            const sl = c.status_labels && typeof c.status_labels === "object" ? c.status_labels : null;
+            if (sl) {
+                const hit = Object.keys(sl).find((k) => String(k).trim().toLowerCase() === rawState.trim().toLowerCase());
+                if (hit !== undefined)
+                    rawText = String(sl[hit]);
+            }
+            this._el("stState").textContent = noData ? t.state_nodata : rawText;
         } else {
             this._el("stState").textContent = t[`state_${displayState}`];
         }
@@ -2973,6 +3005,8 @@ theme: auto                                 # auto | light | dark | ha (ha = nat
 hide_status_panel: false                    # true hides the status panel while idle
 stage_entity: sensor.washer_run_status       # optional: extra pill next to the status text (e.g. washing / rinsing / spinning)
 stage_prefix: ""                            # optional text placed before the stage
+status_labels:                              # optional: rename the raw status text shown with show_raw_status (YAML only)
+  busy: Washing
 stage_labels:                               # optional: rename raw values (YAML only)
   washing: Giặt
 stage_hide_states: [not run, unknown]        # optional: values for which the pill is hidden
@@ -2993,4 +3027,4 @@ confirm_plug_off: true                      # true displays a confirmation popup
 # appliance_type: microwave
 ============================================================ */
 
-console.info("%c washing-machine-card %c xiaomi-ui v3: controls + mode + temperature ", "background:#2f80ed;color:#fff;border-radius:3px 0 0 3px", "background:#22b263;color:#fff;border-radius:0 3px 3px 0");
+console.info("%c washing-machine-card %c xiaomi-ui v4: vi language + controls + mode + temperature + stage ", "background:#2f80ed;color:#fff;border-radius:3px 0 0 3px", "background:#22b263;color:#fff;border-radius:0 3px 3px 0");
