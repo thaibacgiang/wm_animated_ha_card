@@ -1470,7 +1470,7 @@ class WashingMachineCard extends HTMLElement {
           font-size: 11px; font-weight: 800; letter-spacing: 1.4px; color: var(--wm-label);
           margin-bottom: 10px;
         }
-        .lc-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
+        .lc-grid { display: grid; grid-template-columns: repeat(var(--lc-cols, 4), minmax(0, 1fr)); }
         .lc-item { padding: 0 12px 0 0; min-width: 0; cursor: pointer; }
         .lc-item:not(.hidden) ~ .lc-item:not(.hidden) {
           border-left: 1px solid var(--wm-divider);
@@ -1478,7 +1478,17 @@ class WashingMachineCard extends HTMLElement {
         }
         .lc-label { font-size: 10px; font-weight: 700; letter-spacing: .8px; color: var(--wm-label); }
         .lc-value { font-size: 14.5px; font-weight: 800; margin-top: 5px; overflow-wrap: break-word; }
-        .lc-unit { font-size: 11px; font-weight: 700; color: var(--wm-accent); }
+        .lc-unit { font-size: 11px; font-weight: 700; color: var(--wm-accent); white-space: nowrap; }
+        /* 1-2 columns: show them as roomy tiles instead of cramped table cells */
+        .lc-tiles .lc-grid { gap: 10px; }
+        .lc-tiles .lc-item,
+        .lc-tiles .lc-item:not(.hidden) ~ .lc-item:not(.hidden) {
+          border: 1px solid var(--wm-divider); border-radius: 14px; padding: 10px 14px;
+          background: color-mix(in srgb, var(--wm-accent) 7%, transparent);
+        }
+        .lc-tiles .lc-label { font-size: 10.5px; }
+        .lc-tiles .lc-value { font-size: 18px; margin-top: 6px; line-height: 1.2; }
+        .lc-tiles .lc-unit { font-size: 12px; margin-left: 3px; }
         .hidden { display: none !important; }
       </style>
 
@@ -1643,7 +1653,7 @@ class WashingMachineCard extends HTMLElement {
         this._el("notifyBtn").title = t.tip_notify;
         this._el("plugBtn").title = t.tip_plug;
         this._el("chartBtn").title = t.tip_history;
-        this._el("lcTitle").textContent = t.last_cycle;
+        this._el("lcTitle").textContent = c.last_cycle_title ?? t.last_cycle;
         this._el("lcStartLabel").textContent = t.start;
         this._el("lcDurationLabel").textContent = t.duration;
         this._el("lcEnergyLabel").textContent = c.energy_label ?? t.energy;
@@ -1698,8 +1708,14 @@ class WashingMachineCard extends HTMLElement {
             this._el("lcCostV").innerHTML = this._fmtCustom(s, c.cost_unit ?? c.currency);
             anyLc = true;
         }
-        if (anyLc)
-            this._el("lastCycle").classList.remove("hidden");
+        if (anyLc) {
+            const lc = this._el("lastCycle");
+            lc.classList.remove("hidden");
+            const cols = ["lcStart", "lcDuration", "lcEnergy", "lcCost"]
+                .filter((id) => !this._el(id).classList.contains("hidden")).length || 1;
+            lc.style.setProperty("--lc-cols", String(cols));
+            lc.classList.toggle("lc-tiles", cols <= 2);
+        }
 
         if (c.notify_entity) {
             const on = this._st(c.notify_entity)?.state === "on";
@@ -2145,6 +2161,10 @@ class WashingMachineCardEditor extends HTMLElement {
                         key: "cost_unit",
                         kind: "text",
                         title: "Cost column unit (optional)",
+                    }, {
+                        key: "last_cycle_title",
+                        kind: "text",
+                        title: "Info panel title (optional)",
                     }, {
                         key: "currency",
                         kind: "text",
@@ -2646,6 +2666,7 @@ energy_unit: kWh                           # optional: custom unit ("" = none)
 cost_entity: input_number.wm_last_cost
 cost_label: COST                           # optional
 cost_unit: "€"                             # optional
+last_cycle_title: LAST CYCLE               # optional: panel title
 currency: "€"
 language: auto                              # auto | en | ru | de | fr | nl | pt | el (auto = match Home Assistant's language)
 theme: auto                                 # auto | light | dark | ha (ha = native Home Assistant colours)
