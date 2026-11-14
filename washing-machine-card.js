@@ -664,6 +664,41 @@ class WashingMachineCard extends HTMLElement {
         return c[`${key}_label`] ?? this._t?.[`ctl_${key}`] ?? en[`ctl_${key}`] ?? fallback;
     }
 
+    _updateStage() {
+        const c = this._config;
+        const el = this._el("stStage");
+        if (!c.stage_entity) {
+            el.classList.add("hidden");
+            return;
+        }
+        const st = this._st(c.stage_entity);
+        const raw = st ? String(st.state) : "";
+        const key = raw.trim().toLowerCase();
+        const hide = (Array.isArray(c.stage_hide_states) ? c.stage_hide_states
+            : ["not run", "unknown", "unavailable", "none", ""]).map((x) => String(x).trim().toLowerCase());
+        if (!st || hide.includes(key)) {
+            el.classList.add("hidden");
+            return;
+        }
+        let text = null;
+        const map = c.stage_labels && typeof c.stage_labels === "object" ? c.stage_labels : null;
+        if (map) {
+            const hit = Object.keys(map).find((k) => String(k).trim().toLowerCase() === key);
+            if (hit !== undefined)
+                text = String(map[hit]);
+        }
+        if (text === null) {
+            try {
+                if (typeof this._hass?.formatEntityState === "function")
+                    text = this._hass.formatEntityState(st);
+            } catch (e) { text = null; }
+        }
+        if (!text)
+            text = WashingMachineCard.capitalize(raw, this._t?.locale);
+        el.textContent = c.stage_prefix ? `${c.stage_prefix} ${text}` : text;
+        el.classList.remove("hidden");
+    }
+
     _updateSelect(box, label, sel, entityId, labelText, unit, sigKey) {
         const st = this._st(entityId);
         this._el(box).classList.remove("hidden");
@@ -1539,6 +1574,15 @@ class WashingMachineCard extends HTMLElement {
         }
         .st-col { flex: 1; min-width: 0; }
         .st-state { font-size: 16.5px; font-weight: 700; }
+        .st-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+        .st-stage {
+          display: inline-flex; align-items: center; gap: 6px;
+          font-size: 12px; font-weight: 700; padding: 4px 11px; border-radius: 999px; white-space: nowrap;
+          color: var(--wm-accent);
+          background: color-mix(in srgb, var(--wm-accent) 14%, transparent);
+          border: 1px solid color-mix(in srgb, var(--wm-accent) 32%, transparent);
+        }
+        .st-stage::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
         .st-row {
           display: flex; align-items: baseline; justify-content: space-between;
           margin-top: 9px; gap: 8px;
@@ -1644,7 +1688,10 @@ class WashingMachineCard extends HTMLElement {
               </div>
             </div>
             <div class="st-col">
-              <div class="st-state" id="stState"></div>
+              <div class="st-line">
+                <div class="st-state" id="stState"></div>
+                <div class="st-stage hidden" id="stStage"></div>
+              </div>
               <div class="st-row hidden" id="powerRow">
                 <span class="st-power-label" id="powerLabel"></span>
                 <span class="st-power" id="powerValue">—</span>
@@ -1807,6 +1854,7 @@ class WashingMachineCard extends HTMLElement {
         } else {
             this._el("stState").textContent = t[`state_${displayState}`];
         }
+        this._updateStage();
         const hideStatus = !!c.hide_status_panel && !active && applianceState !== "standby";
         this._el("statusPanel").classList.toggle("hidden", hideStatus);
         this._el("notifyBtn").title = t.tip_notify;
@@ -2237,6 +2285,19 @@ class WashingMachineCardEditor extends HTMLElement {
                                 domain: ["switch", "input_boolean"]
                             }
                         },
+                    }, {
+                        key: "stage_entity",
+                        kind: "entity",
+                        title: "Stage / progress entity (shown next to the status)",
+                        selector: {
+                            entity: {
+                                domain: ["sensor", "select", "input_select", "input_text"]
+                            }
+                        },
+                    }, {
+                        key: "stage_prefix",
+                        kind: "text",
+                        title: "Stage text prefix (optional)",
                     }, {
                         key: "start_entity",
                         kind: "entity",
@@ -2910,6 +2971,11 @@ currency: "€"
 language: auto                              # auto | en | ru | de | fr | nl | pt | el (auto = match Home Assistant's language)
 theme: auto                                 # auto | light | dark | ha (ha = native Home Assistant colours)
 hide_status_panel: false                    # true hides the status panel while idle
+stage_entity: sensor.washer_run_status       # optional: extra pill next to the status text (e.g. washing / rinsing / spinning)
+stage_prefix: ""                            # optional text placed before the stage
+stage_labels:                               # optional: rename raw values (YAML only)
+  washing: Giặt
+stage_hide_states: [not run, unknown]        # optional: values for which the pill is hidden
 show_raw_status: false                      # true shows the raw value of the status entity in the card's status panel (hidden in the editor when status_entity is an input_boolean)
 start_entity: button.washer_start               # optional: control buttons inside the card
 pause_entity: button.washer_pause
