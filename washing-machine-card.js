@@ -520,6 +520,23 @@ class WashingMachineCard extends HTMLElement {
         decimal_comma: { group: ".", decimal: "," },
         space_comma: { group: " ", decimal: "," },
     };
+    // Generic "last cycle" cell: numbers get formatted + unit, text states (e.g. a wash mode) are shown as-is.
+    _fmtCustom(stateObj, unit) {
+        const raw = stateObj ? String(stateObj.state) : "";
+        if (!raw || ["unknown", "unavailable", "none"].includes(raw.toLowerCase()))
+            return "—";
+        const num = this._fmtNum(raw, 2);
+        if (num !== null && /^-?\d+([.,]\d+)?$/.test(raw.trim()))
+            return unit ? `${num} <span class="lc-unit">${unit}</span>` : num;
+        let text = raw;
+        try {
+            if (typeof this._hass?.formatEntityState === "function")
+                text = this._hass.formatEntityState(stateObj) || raw;
+        } catch (e) { text = raw; }
+        const safe = String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return unit ? `${safe} <span class="lc-unit">${unit}</span>` : safe;
+    }
+
     _fmtNum(value, digits = 2) {
         const n = parseFloat(value);
         if (isNaN(n))
@@ -1629,8 +1646,8 @@ class WashingMachineCard extends HTMLElement {
         this._el("lcTitle").textContent = t.last_cycle;
         this._el("lcStartLabel").textContent = t.start;
         this._el("lcDurationLabel").textContent = t.duration;
-        this._el("lcEnergyLabel").textContent = t.energy;
-        this._el("lcCostLabel").textContent = t.cost;
+        this._el("lcEnergyLabel").textContent = c.energy_label ?? t.energy;
+        this._el("lcCostLabel").textContent = c.cost_label ?? t.cost;
 
         if (c.power_entity) {
             const ps = this._st(c.power_entity);
@@ -1671,18 +1688,14 @@ class WashingMachineCard extends HTMLElement {
         }
         if (c.energy_entity) {
             const s = this._st(c.energy_entity);
-            const v = this._fmtNum(s?.state, 2);
             this._el("lcEnergy").classList.remove("hidden");
-            this._el("lcEnergyV").innerHTML =
-                v !== null ? `${v} <span class="lc-unit">${t.kwh}</span>` : "—";
+            this._el("lcEnergyV").innerHTML = this._fmtCustom(s, c.energy_unit ?? t.kwh);
             anyLc = true;
         }
         if (c.cost_entity) {
             const s = this._st(c.cost_entity);
-            const v = this._fmtNum(s?.state, 2);
             this._el("lcCost").classList.remove("hidden");
-            this._el("lcCostV").innerHTML =
-                v !== null ? `${v} <span class="lc-unit">${c.currency}</span>` : "—";
+            this._el("lcCostV").innerHTML = this._fmtCustom(s, c.cost_unit ?? c.currency);
             anyLc = true;
         }
         if (anyLc)
@@ -2108,6 +2121,14 @@ class WashingMachineCardEditor extends HTMLElement {
                             }
                         },
                     }, {
+                        key: "energy_label",
+                        kind: "text",
+                        title: "Energy column label (optional)",
+                    }, {
+                        key: "energy_unit",
+                        kind: "text",
+                        title: "Energy column unit (optional)",
+                    }, {
                         key: "cost_entity",
                         kind: "entity",
                         title: "Cost entity",
@@ -2116,6 +2137,14 @@ class WashingMachineCardEditor extends HTMLElement {
                                 domain: ["input_number", "sensor"]
                             }
                         },
+                    }, {
+                        key: "cost_label",
+                        kind: "text",
+                        title: "Cost column label (optional)",
+                    }, {
+                        key: "cost_unit",
+                        kind: "text",
+                        title: "Cost column unit (optional)",
                     }, {
                         key: "currency",
                         kind: "text",
@@ -2611,8 +2640,12 @@ power_max: 2500
 last_wash_entity: input_datetime.wm_last_start
 duration_entity: input_number.wm_last_duration
 duration_format: minutes                    # minutes | hhmm (e.g. "1h05" once it reaches 60 min)
-energy_entity: input_number.wm_last_energy
+energy_entity: input_number.wm_last_energy   # any sensor/select: numbers or text
+energy_label: ENERGY                       # optional: custom column label
+energy_unit: kWh                           # optional: custom unit ("" = none)
 cost_entity: input_number.wm_last_cost
+cost_label: COST                           # optional
+cost_unit: "€"                             # optional
 currency: "€"
 language: auto                              # auto | en | ru | de | fr | nl | pt | el (auto = match Home Assistant's language)
 theme: auto                                 # auto | light | dark | ha (ha = native Home Assistant colours)
