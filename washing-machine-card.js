@@ -41,7 +41,7 @@ class WashingMachineCard extends HTMLElement {
             today: "Today", yesterday: "Yesterday",
             tip_notify: "Finish notification", tip_plug: "Machine plug", tip_history: "History",
             confirm_plug_off: "Turn off the plug? This may interrupt the current cycle.",
-            ctl_start: "Start", ctl_pause: "Pause", ctl_stop: "Stop", ctl_mode: "MODE",
+            ctl_start: "Start", ctl_pause: "Pause", ctl_stop: "Stop", ctl_mode: "MODE", ctl_temp: "TEMPERATURE",
             confirm_stop: "Stop the current program?",
             types: {
                 washer: { name: "Washing machine", state_running: "Washing" },
@@ -664,9 +664,40 @@ class WashingMachineCard extends HTMLElement {
         return c[`${key}_label`] ?? this._t?.[`ctl_${key}`] ?? en[`ctl_${key}`] ?? fallback;
     }
 
+    _updateSelect(box, label, sel, entityId, labelText, unit, sigKey) {
+        const st = this._st(entityId);
+        this._el(box).classList.remove("hidden");
+        this._el(label).textContent = labelText;
+        const el = this._el(sel);
+        const opts = Array.isArray(st?.attributes?.options) ? st.attributes.options : [];
+        const sig = opts.join("\u0001");
+        if (sig !== this[sigKey]) {
+            this[sigKey] = sig;
+            el.innerHTML = "";
+            for (const o of opts) {
+                const op = document.createElement("option");
+                op.value = o;
+                let text = o;
+                if (unit && /^-?\d+(\.\d+)?$/.test(String(o).trim())) {
+                    text = `${o}${unit}`;
+                } else {
+                    try {
+                        if (typeof this._hass?.formatEntityState === "function")
+                            text = this._hass.formatEntityState(st, o) || o;
+                    } catch (e) { text = o; }
+                }
+                op.textContent = text;
+                el.appendChild(op);
+            }
+        }
+        el.disabled = !st || st.state === "unavailable" || opts.length === 0;
+        if (st && this.shadowRoot.activeElement !== el && opts.includes(st.state))
+            el.value = st.state;
+    }
+
     _updateControls() {
         const c = this._config;
-        const has = !!(c.start_entity || c.pause_entity || c.stop_entity || c.mode_entity);
+        const has = !!(c.start_entity || c.pause_entity || c.stop_entity || c.mode_entity || c.temp_entity);
         if (!has)
             return;
         this._el("controls").classList.remove("hidden");
@@ -684,33 +715,20 @@ class WashingMachineCard extends HTMLElement {
         }
         this._el("ctlRow").style.setProperty("--ctl-cols", String(n || 1));
         this._el("ctlRow").classList.toggle("hidden", n === 0);
+        const en = WashingMachineCard.STRINGS.en;
+        let sels = 0;
         if (c.mode_entity) {
-            const st = this._st(c.mode_entity);
-            const box = this._el("ctlMode");
-            const sel = this._el("ctlModeSel");
-            box.classList.remove("hidden");
-            this._el("ctlModeLabel").textContent = c.mode_label ?? this._t?.ctl_mode ?? WashingMachineCard.STRINGS.en.ctl_mode;
-            const opts = Array.isArray(st?.attributes?.options) ? st.attributes.options : [];
-            const sig = opts.join("\u0001");
-            if (sig !== this._modeSig) {
-                this._modeSig = sig;
-                sel.innerHTML = "";
-                for (const o of opts) {
-                    const op = document.createElement("option");
-                    op.value = o;
-                    let label = o;
-                    try {
-                        if (typeof this._hass?.formatEntityState === "function")
-                            label = this._hass.formatEntityState(st, o) || o;
-                    } catch (e) { label = o; }
-                    op.textContent = label;
-                    sel.appendChild(op);
-                }
-            }
-            sel.disabled = !st || st.state === "unavailable" || opts.length === 0;
-            if (st && this.shadowRoot.activeElement !== sel && opts.includes(st.state))
-                sel.value = st.state;
+            sels++;
+            this._updateSelect("ctlMode", "ctlModeLabel", "ctlModeSel", c.mode_entity,
+                c.mode_label ?? this._t?.ctl_mode ?? en.ctl_mode, "", "_modeSig");
         }
+        if (c.temp_entity) {
+            sels++;
+            this._updateSelect("ctlTemp", "ctlTempLabel", "ctlTempSel", c.temp_entity,
+                c.temp_label ?? this._t?.ctl_temp ?? en.ctl_temp, c.temp_unit ?? "°C", "_tempSig");
+        }
+        this._el("ctlSelects").classList.toggle("hidden", sels === 0);
+        this._el("ctlSelects").style.setProperty("--ctl-sel-cols", String(sels || 1));
     }
 
     _confirmTogglePlug() {
@@ -1575,11 +1593,12 @@ class WashingMachineCard extends HTMLElement {
         .ctl-btn:active { transform: scale(.96); }
         .ctl-btn.ctl-stop svg { fill: #e5484d; }
         .ctl-btn[disabled] { opacity: .4; cursor: default; pointer-events: none; }
-        .ctl-mode { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
-        .ctl-row.hidden + .ctl-mode { margin-top: 0; }
-        .ctl-mode-label { font-size: 10px; font-weight: 700; letter-spacing: .8px; color: var(--wm-label); flex-shrink: 0; }
+        .ctl-selects { display: grid; grid-template-columns: repeat(var(--ctl-sel-cols, 1), minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+        .ctl-row.hidden + .ctl-selects { margin-top: 0; }
+        .ctl-sel { min-width: 0; }
+        .ctl-mode-label { font-size: 10px; font-weight: 700; letter-spacing: .8px; color: var(--wm-label); margin: 0 0 6px 2px; }
         .ctl-select {
-          flex: 1; min-width: 0; padding: 10px 12px; border-radius: 12px; cursor: pointer;
+          width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 12px; cursor: pointer;
           border: 1px solid var(--wm-divider); color: var(--wm-text);
           background: color-mix(in srgb, var(--wm-accent) 7%, transparent);
           font: inherit; font-size: 14px; font-weight: 700;
@@ -1671,9 +1690,15 @@ class WashingMachineCard extends HTMLElement {
                 <span id="ctlStopL"></span>
               </button>
             </div>
-            <div class="ctl-mode hidden" id="ctlMode">
-              <div class="ctl-mode-label" id="ctlModeLabel"></div>
-              <select class="ctl-select" id="ctlModeSel"></select>
+            <div class="ctl-selects hidden" id="ctlSelects">
+              <div class="ctl-sel hidden" id="ctlMode">
+                <div class="ctl-mode-label" id="ctlModeLabel"></div>
+                <select class="ctl-select" id="ctlModeSel"></select>
+              </div>
+              <div class="ctl-sel hidden" id="ctlTemp">
+                <div class="ctl-mode-label" id="ctlTempLabel"></div>
+                <select class="ctl-select" id="ctlTempSel"></select>
+              </div>
             </div>
           </div>
         </div>
@@ -1703,6 +1728,8 @@ class WashingMachineCard extends HTMLElement {
             });
         if (c.mode_entity)
             this._el("ctlModeSel").addEventListener("change", (ev) => this._selectOption(c.mode_entity, ev.target.value));
+        if (c.temp_entity)
+            this._el("ctlTempSel").addEventListener("change", (ev) => this._selectOption(c.temp_entity, ev.target.value));
         if (c.last_wash_entity)
             this._el("lcStart").addEventListener("click", mi(c.last_wash_entity));
         if (c.duration_entity)
@@ -2246,6 +2273,23 @@ class WashingMachineCardEditor extends HTMLElement {
                                 domain: ["select", "input_select"]
                             }
                         },
+                    }, {
+                        key: "temp_entity",
+                        kind: "entity",
+                        title: "Temperature selector entity",
+                        selector: {
+                            entity: {
+                                domain: ["select", "input_select"]
+                            }
+                        },
+                    }, {
+                        key: "temp_label",
+                        kind: "text",
+                        title: "Temperature selector label (optional)",
+                    }, {
+                        key: "temp_unit",
+                        kind: "text",
+                        title: "Temperature option unit (optional, default °C)",
                     }, {
                         key: "start_label",
                         kind: "text",
@@ -2871,6 +2915,8 @@ start_entity: button.washer_start               # optional: control buttons insi
 pause_entity: button.washer_pause
 stop_entity: button.washer_stop
 mode_entity: select.washer_mode             # optional: programme/mode dropdown
+temp_entity: select.washer_temperature      # optional: temperature dropdown (numeric options get temp_unit)
+temp_unit: "°C"
 confirm_stop: true                          # confirm before pressing stop
 confirm_plug_off: true                      # true displays a confirmation popup before turning off the `plug_entity`.
 
